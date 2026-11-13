@@ -1,0 +1,37 @@
+[project]
+name = "sports-betting-qa"
+version = "0.1.0"
+description = "UI (Selenium) and API (requests) test automation for the Single Bet Placement feature"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pytest>=8.3",
+    "pytest-html>=4.1",
+    "python-dotenv>=1.0",
+    "requests>=2.32",
+    "selenium>=4.25",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.7",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "ui: end-to-end browser tests (Selenium)",
+    "api: backend API tests (requests)",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]

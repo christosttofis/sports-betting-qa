@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# Tests run against a shared live app with one user account, so two runs at the
+# same time would reset each other's balance. Queue runs instead of overlapping.
+concurrency:
+  group: live-app-tests
+  cancel-in-progress: false
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+      - run: uv sync
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+
+  tests:
+    runs-on: ubuntu-24.04
+    env:
+      USER_ID: ${{ secrets.USER_ID }}
+      HEADLESS: "true"
+    defaults:
+      run:
+        shell: bash # explicit bash enables pipefail, so `| tee` keeps pytest's exit code
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+      - run: uv sync
+      - run: mkdir -p artifacts
+      - name: API tests
+        run: uv run pytest -m api --html=artifacts/api-report.html --self-contained-html | tee artifacts/api.log
+      - name: UI tests
+        if: ${{ !cancelled() }}
+        run: uv run pytest -m ui --html=artifacts/ui-report.html --self-contained-html | tee artifacts/ui.log
+      - name: Test summary
+        if: ${{ !cancelled() }}
+        run: |
+          result() { tail -n 1 "artifacts/$1.log" 2>/dev/null | sed 's/=//g; s/^ *//; s/ *$//' || true; }
+          {
+            echo "## Test results"
+            echo "| Suite | Result |"
+            echo "|---|---|"
+            echo "| API | $(result api) |"
+            echo "| UI | $(result ui) |"
+            echo
+            echo "xfailed = known bug (see docs/BUG_REPORTS.md). HTML reports and screenshots: **test-reports** artifact below."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload test reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports
+          path: artifacts/
